@@ -1,0 +1,54 @@
+services:
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb_liebherr
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - /mnt/influx_data_liebherr:/var/lib/influxdb2
+
+  lh-poller:
+    image: dockerHub/lh-poller:latest
+    container_name: lh_poller
+    restart: unless-stopped
+    environment:
+      LIEBHERR_API_URL: http://1.2.3.4:8080
+      LIEBHERR_API_TOKEN: ""
+      POLL_INTERVAL: "3600"
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: abcdefghijklmnopqrstuvwxyz0123456789abcdef
+      INFLUX_ORG: org-name
+      INFLUX_BUCKET: bucket-name
+    depends_on:
+      - influxdb
+
+  lh-exporter:
+    build: ./exporter
+    image: dockerHub/lh-exporter:latest
+    container_name: lh_exporter
+    restart: unless-stopped
+    env_file: ./config/ozkv.env
+    environment:
+      EXPORT_FREQUENCY: monthly
+    depends_on:
+      - influxdb
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_liebherr
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: mySecretPassword
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Needed so Grafana can talk to InfluxDB v2
+      GF_INSTALL_PLUGINS: "grafana-influxdb-flux-datasource"
+    volumes:
+      - /mnt/grafana_data:/var/lib/grafana
+      - /mnt/grafana_provisioning:/etc/grafana/provisioning
+
+volumes:
+  influxdb_data:

@@ -1,0 +1,8 @@
+.git/
+.gitignore
+.DS_Store
+**/ozkv.env
+config/ozkv.env
+**/.env
+__pycache__/
+*.py[codz]
