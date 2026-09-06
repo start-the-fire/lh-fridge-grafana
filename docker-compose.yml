@@ -35,20 +35,24 @@ services:
       - influxdb
 
   grafana:
-    image: grafana/grafana:latest
+    build: ./grafana
+    image: dockerHub/lh-grafana:latest
     container_name: grafana_liebherr
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: mySecretPassword
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      # Needed so Grafana can talk to InfluxDB v2
-      GF_INSTALL_PLUGINS: "grafana-influxdb-flux-datasource"
+      INFLUX_URL: ${INFLUX_URL:-http://influxdb:8086}
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-change-me}
+      INFLUX_ORG: ${INFLUX_ORG:-lh}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-fridge}
     volumes:
       - /mnt/grafana_data:/var/lib/grafana
-      - /mnt/grafana_provisioning:/etc/grafana/provisioning
+    depends_on:
+      - influxdb
 
 volumes:
   influxdb_data:

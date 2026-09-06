@@ -1,9 +1,49 @@
 # Liebherr Fridge Monitoring
 
-This stack polls a Liebherr fridge through its SmartModule Local API, stores the
-measurements in InfluxDB, and provides Grafana dashboards for monitoring and
-alerting. The stack also includes a scheduled exporter that emails CSV and PDF
-reports.
+This project collects Liebherr fridge telemetry, visualizes it in Grafana, and
+exports periodic CSV and PDF reports. The poller reads the SmartModule Local API
+and writes the measurements to a dedicated InfluxDB instance. Grafana and the
+exporter read the same time-series data.
+
+The production InfluxDB is a separate service and is not managed by this
+project. It must be configured with a retention period of 720 days. This keeps
+approximately two years of fridge history available for operational review and
+reporting while allowing the database to remove older data automatically.
+
+## Data Flow
+
+The system follows this flow:
+
+1. The poller periodically requests appliance information and zone state from
+   the Liebherr SmartModule Local API.
+2. Each successful poll is written to the dedicated InfluxDB bucket configured
+   by `INFLUX_BUCKET`.
+3. Grafana queries the time series for live status tiles, temperature trends,
+   alarm states, door state, and longer-range operational statistics.
+4. The exporter queries completed reporting periods and sends CSV and PDF
+   reports by email.
+
+The poller currently collects zone `0` and writes measurement
+`fridge_zone_state`. The series is tagged with `device_serial`, `model`, and
+`zone`. Fields include:
+
+| Field | Description |
+| --- | --- |
+| `temp_displayed` | Current displayed temperature |
+| `temp_setpoint` | Configured temperature setpoint |
+| `door` | Door state, `0` closed or `1` open |
+| `upper_alarm_state` | Upper temperature alarm state |
+| `upper_alarm_limit` | Upper alarm limit |
+| `upper_alarm_temp` | Upper alarm temperature value |
+| `lower_alarm_state` | Lower temperature alarm state |
+| `lower_alarm_limit` | Lower alarm limit |
+| `lower_alarm_temp` | Lower alarm temperature value |
+| `powerfail_upper` | Upper power-failure alarm value |
+| `powerfail_lower` | Lower power-failure alarm value |
+| `emergency_alarm` | Emergency alarm state |
+
+Boolean-like states are stored as integer values so they can be queried and
+aggregated consistently in Grafana and the exporter.
 
 ## Applications
 
@@ -12,7 +52,8 @@ reports.
 The poller calls the Liebherr Local API at the configured interval and writes the
 zone status to InfluxDB measurement `fridge_zone_state`. It records the displayed
 temperature, temperature setpoint, door status, alarm states, and power-failure
-values. It is published as:
+values. A successful poll writes one point containing the current values and the
+device identity tags. It is published as:
 
 ```text
 startthefire/lh-fridge-poller:v2.0
@@ -30,10 +71,56 @@ Required poller settings:
 | `INFLUX_ORG` | InfluxDB organization |
 | `INFLUX_BUCKET` | InfluxDB bucket |
 
+### Grafana
+
+Grafana is the operational visualization layer. It uses the InfluxDB Flux
+datasource and provides two provisioned dashboards:
+
+- `Liebherr Fridge - Overview` shows current temperature, setpoint, door and
+  alarm status, a temperature trend, and door/alarm timelines. It is intended
+  for daily monitoring and rapid status checks.
+- `Liebherr Fridge - Operations` shows average, minimum, and maximum
+  temperature, sample counts, door-open samples, alarm samples, a seven-day
+  temperature trend, and state timelines. It is intended for operational
+  analysis and troubleshooting.
+
+The dashboards compare displayed temperature with the configured setpoint and
+upper/lower alarm limits. They use the Grafana time-range selector, so the same
+views can be used for recent checks or historical analysis within the 720-day
+retention period.
+
+Grafana is built from `grafana/Dockerfile`. At startup it provisions the Flux
+datasource and renders the dashboard templates using the InfluxDB connection
+settings. On a new customer deployment, the dashboards and container image can
+remain unchanged; the InfluxDB URL, credentials, organization, bucket, and
+Grafana credentials are site-specific.
+
+Grafana settings:
+
+| Variable | Description |
+| --- | --- |
+| `GRAFANA_ADMIN_USER` | Initial Grafana administrator username |
+| `GRAFANA_ADMIN_PASSWORD` | Initial Grafana administrator password |
+| `INFLUX_URL` | Dedicated InfluxDB URL |
+| `INFLUX_TOKEN` | InfluxDB access token with query permission |
+| `INFLUX_ORG` | InfluxDB organization |
+| `INFLUX_BUCKET` | InfluxDB bucket, normally `fridge` |
+
+The production InfluxDB instance is external to this project. Ensure the Grafana
+datasource points to that instance and that its bucket has the required 720-day
+retention policy. The `influxdb` service in the example Compose file is a local
+demonstration layout; it should not be treated as the managed production storage
+service when InfluxDB is operated separately.
+
+For manual dashboard imports, use the JSON files under `test/grafana/` and map
+`DS_INFLUXDB` to the existing customer InfluxDB datasource. These files use the
+literal bucket `fridge` and are intended for testing or manual import. The
+container uses the provisioned templates under `grafana/templates/`.
+
 ### Exporter
 
-The exporter queries the completed reporting period from InfluxDB and sends an
-email with two attachments:
+The exporter queries the completed reporting period from the dedicated InfluxDB
+and sends an email with two attachments:
 
 - A CSV containing `_time`, `temp_displayed`, and `temp_setpoint`.
 - A PDF containing a graph of displayed temperature and setpoint, an average
@@ -138,6 +225,28 @@ services:
       interstate:
         ipv4_address: 172.19.0.93
 
+  grafana:
+    build: ./grafana
+    image: startthefire/lh-grafana:latest
+    container_name: grafana_liebherr
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GRAFANA_ADMIN_USER: "admin"
+      GRAFANA_ADMIN_PASSWORD: "change-me"
+      INFLUX_URL: "http://influxdb:8086"
+      INFLUX_TOKEN: "dummy-influx-token-change-me"
+      INFLUX_ORG: "fridge-demo"
+      INFLUX_BUCKET: "fridge"
+    volumes:
+      - /mnt/grafana_data:/var/lib/grafana
+    depends_on:
+      - influxdb
+    networks:
+      interstate:
+        ipv4_address: 172.19.0.92
+
 networks:
   interstate:
     external: true
@@ -167,3 +276,7 @@ docker compose exec lh-exporter python -u /app/export.py --test
 
 The test command sends a real report for the configured reporting period and
 then exits; it does not start the scheduler.
+
+The exporter uses the same InfluxDB URL, organization, bucket, and token as the
+poller and Grafana. Reports therefore reflect the same retained telemetry that
+is visible in the dashboards.
