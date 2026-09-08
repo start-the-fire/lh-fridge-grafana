@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Generic refrigerator image">
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f8fbff"/><stop offset="1" stop-color="#dbe6f2"/></linearGradient><linearGradient id="body" x1="0" x2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#d5e0ec"/></linearGradient></defs>
+  <rect width="800" height="500" rx="36" fill="url(#bg)"/><rect x="250" y="40" width="300" height="420" rx="20" fill="url(#body)" stroke="#9fb2c8" stroke-width="5"/><path d="M250 250h300" stroke="#9fb2c8" stroke-width="5"/><path d="M520 130v70M520 310v70" stroke="#52708e" stroke-width="12" stroke-linecap="round"/><circle cx="400" cy="210" r="34" fill="#1f73d0" opacity=".18"/><path d="M400 192v38M381 211h38" stroke="#1f73d0" stroke-width="8" stroke-linecap="round"/>
+</svg>

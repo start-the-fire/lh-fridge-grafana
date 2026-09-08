@@ -209,3 +209,12 @@ __marimo__/
 # OZKV environment files
 ozkv.env
 config/ozkv.env
+
+# TempVerity app artifacts
+TempVerity/frontend/node_modules/
+TempVerity/frontend/dist/
+TempVerity/.venv/
+TempVerity/*.sqlite3
+TempVerity/*.db
+
+.DS_Store
