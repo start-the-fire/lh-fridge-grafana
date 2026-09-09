@@ -98,6 +98,11 @@ class AppService:
             grace_minutes=alert.grace_minutes,
             activated_at=alert.activated_at,
             resolved_at=alert.resolved_at,
+            condition_key=alert.condition_key,
+            recovery_started_at=alert.recovery_started_at,
+            acknowledged_at=alert.acknowledged_at,
+            acknowledged_by=alert.acknowledged_by,
+            acknowledgement_comment=alert.acknowledgement_comment,
         )
 
     def _event_read(self, event: Event) -> EventRead:
@@ -375,27 +380,85 @@ class AppService:
             alert_settings = {}
         connectivity_grace = max(0, int(alert_settings.get("connectivityGraceMinutes", 10)))
         alarm_grace = max(0, int(alert_settings.get("alarmGraceMinutes", 5)))
-        conditions: list[tuple[str, str, str, int]] = []
+        recovery_grace = max(0, int(alert_settings.get("recoveryGraceMinutes", 0)))
+        conditions: list[tuple[str, str, str, int, int]] = []
         if state.get("connectivity_failure"):
-            conditions.append(("connectivity", "high", "Connectivity lost", connectivity_grace))
+            conditions.append(("connectivity", "high", "Connectivity lost", connectivity_grace, recovery_grace))
         for index, zone in enumerate(state.get("zones", [])):
             if isinstance(zone, dict) and zone.get("alarm"):
-                conditions.append((f"alarm:{index}", "high", str(zone.get("alarm")), alarm_grace))
-        existing = self.session.scalars(select(Alert).where(Alert.device_id == device.id, Alert.status.in_(["pending", "active"]))).all()
+                conditions.append((f"appliance:{index}:{zone.get('alarm')}", "high", str(zone.get("alarm")), alarm_grace, recovery_grace))
+        rules = alert_settings.get("softwareRules", [])
+        if isinstance(rules, list):
+            for rule in rules:
+                if not isinstance(rule, dict) or rule.get("enabled", True) is False:
+                    continue
+                if rule.get("device_id") not in (None, "", device.id):
+                    continue
+                try:
+                    zone_index = int(rule.get("zone_index", 0))
+                except (TypeError, ValueError):
+                    continue
+                zone = next((item for item in state.get("zones", []) if isinstance(item, dict) and int(item.get("zone_index", 0)) == zone_index), None)
+                if not isinstance(zone, dict):
+                    continue
+                condition = str(rule.get("condition", "above")).lower()
+                if condition == "door_open":
+                    triggered = bool(zone.get("door_open"))
+                else:
+                    try:
+                        threshold = float(rule["threshold"])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if not isinstance(zone.get("temperature_c"), (int, float)):
+                        continue
+                    triggered = float(zone["temperature_c"]) > threshold if condition == "above" else float(zone["temperature_c"]) < threshold
+                if triggered:
+                    rule_id = str(rule.get("id") or f"rule-{zone_index}-{condition}-{threshold:g}")
+                    title = str(rule.get("name") or f"Temperature {condition} limit exceeded")
+                    conditions.append((f"software:{rule_id}", "high", title, max(0, int(rule.get("grace_minutes", alarm_grace))), max(0, int(rule.get("recovery_grace_minutes", recovery_grace)))))
+        existing = self.session.scalars(select(Alert).where(Alert.device_id == device.id, Alert.status.in_(["pending", "active", "recovery"]))).all()
         current_keys = {key for key, *_ in conditions}
         for alert in existing:
-            key = "connectivity" if alert.zone_index is None else f"alarm:{alert.zone_index}"
-            if key not in current_keys:
-                alert.status = "resolved"
-                alert.resolved_at = now
-        for key, severity, title, grace in conditions:
-            zone_index = None if key == "connectivity" else int(key.split(":", 1)[1])
-            alert = next((item for item in existing if item.zone_index == zone_index), None)
+            if alert.condition_key not in current_keys:
+                if alert.status == "active":
+                    alert.status = "recovery"
+                    alert.recovery_started_at = now
+                elif alert.status == "pending":
+                    alert.status = "resolved"
+                    alert.resolved_at = now
+                elif alert.status == "recovery" and alert.recovery_started_at is not None and (now - alert.recovery_started_at).total_seconds() >= recovery_grace * 60:
+                    alert.status = "resolved"
+                    alert.resolved_at = now
+        for key, severity, title, grace, recovery in conditions:
+            zone_index = None if key == "connectivity" or key.startswith("software:") else int(key.split(":", 2)[1])
+            alert = next((item for item in existing if item.condition_key == key), None)
             if alert is None:
-                self.session.add(Alert(device_id=device.id, zone_index=zone_index, severity=severity, title=title, detail=title, status="pending", grace_minutes=grace, activated_at=now))
+                self.session.add(Alert(device_id=device.id, zone_index=zone_index, condition_key=key, severity=severity, title=title, detail=title, status="pending", grace_minutes=grace, activated_at=now))
                 continue
             if alert.status == "pending" and (now - alert.activated_at).total_seconds() >= alert.grace_minutes * 60:
                 alert.status = "active"
+            elif alert.status == "recovery":
+                alert.status = "active"
+                alert.recovery_started_at = None
+            elif alert.status == "recovery" and alert.recovery_started_at is not None and (now - alert.recovery_started_at).total_seconds() >= recovery * 60:
+                alert.status = "resolved"
+                alert.resolved_at = now
+
+    def acknowledge_alert(self, alert_id: int, user_id: int | None, comment: str) -> AlertRead:
+        alert = self.session.get(Alert, alert_id)
+        if alert is None:
+            raise KeyError(alert_id)
+        if alert.status not in {"pending", "active", "recovery"}:
+            raise ValueError("Only an open alarm can be acknowledged")
+        if alert.acknowledged_at is not None:
+            return self._alert_read(alert)
+        now = datetime.now(timezone.utc)
+        alert.acknowledged_at = now
+        alert.acknowledged_by = user_id
+        alert.acknowledgement_comment = comment.strip() or None
+        self.session.add(Event(device_id=alert.device_id, zone_index=alert.zone_index, kind="alarm-acknowledged", status="active", detail=f"{alert.title} acknowledged", created_at=now))
+        self.session.commit()
+        return self._alert_read(alert)
 
     def device_zone(self, device_id: str, zone_index: int) -> ZoneSnapshot:
         device = self.session.get(Device, device_id)

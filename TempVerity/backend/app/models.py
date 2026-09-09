@@ -45,10 +45,15 @@ class Alert(Base):
     severity: Mapped[str] = mapped_column(String(24), nullable=False)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     detail: Mapped[str] = mapped_column(Text, nullable=False)
+    condition_key: Mapped[str] = mapped_column(String(160), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
     grace_minutes: Mapped[int] = mapped_column(Integer, default=0)
     activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recovery_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    acknowledgement_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

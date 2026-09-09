@@ -61,9 +61,9 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <span className="sidebar-version">v{metadata?.version ?? "0.1.0"}</span>
         <a className="sidebar-footer-link support-link" href={`mailto:${supportEmail}`}><FooterIcon kind="help" /><span>Help &amp; Support</span></a>
         <Link className="sidebar-footer-link about-link" to="/about"><FooterIcon kind="about" /><span>About</span></Link>
+        <span className="sidebar-version">v{metadata?.version ?? "1.0.0"}</span>
       </div>
     </aside>
   );

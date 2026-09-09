@@ -44,6 +44,11 @@ export type AlertRead = {
   grace_minutes: number;
   activated_at: string;
   resolved_at: string | null;
+  condition_key: string;
+  recovery_started_at: string | null;
+  acknowledged_at: string | null;
+  acknowledged_by: number | null;
+  acknowledgement_comment: string | null;
 };
 
 export type EventRead = {

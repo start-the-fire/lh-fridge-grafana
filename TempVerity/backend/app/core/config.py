@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "TempVerity"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
     support_email: str = "placeholder@placeholder.com"  # Replace via TEMPVERITY_SUPPORT_EMAIL before deployment.
     grafana_url: str = ""
     db_path: Path = Field(default=Path("./tempverity.sqlite3"))

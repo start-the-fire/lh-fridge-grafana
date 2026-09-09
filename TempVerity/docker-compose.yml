@@ -1,0 +1,17 @@
+services:
+  tempverity:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tempverity:local
+    container_name: tempverity
+    ports:
+      - "8080:8000"
+    environment:
+      TEMPVERITY_SUPPORT_EMAIL: "${TEMPVERITY_SUPPORT_EMAIL:-placeholder@placeholder.com}"
+      TEMPVERITY_READ_ONLY: "${TEMPVERITY_READ_ONLY:-true}"
+      TEMPVERITY_DB_PATH: /data/tempverity.sqlite3
+      TEMPVERITY_DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

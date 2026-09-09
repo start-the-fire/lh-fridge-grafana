@@ -8,7 +8,9 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const body = await response.json().catch(() => null);
+    const detail = typeof body?.detail === "string" ? body.detail : response.statusText;
+    throw new Error(`Request failed (${response.status})${detail ? `: ${detail}` : ""}`);
   }
 
   if (response.status === 204) {

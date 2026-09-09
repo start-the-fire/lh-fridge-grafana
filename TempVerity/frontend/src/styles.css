@@ -66,7 +66,10 @@ a {
   top: 0;
   align-self: start;
   height: 100vh;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
   background: linear-gradient(180deg, var(--nav) 0%, #0f1e2d 100%);
   color: #f2f6fb;
   padding: 1.5rem 1.25rem;
@@ -74,6 +77,15 @@ a {
   flex-direction: column;
   gap: 2rem;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar > * {
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .brand {
@@ -86,6 +98,9 @@ a {
 .sidebar-logo {
   display: block;
   width: 220px;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 220px;
   height: 74px;
   object-fit: contain;
 }
@@ -171,6 +186,7 @@ a {
 }
 
 .sidebar.collapsed .sidebar-logo {
+  flex: none;
   width: 3.3rem;
   height: 3.3rem;
   object-fit: contain;
@@ -237,6 +253,13 @@ a {
 }
 
 .sidebar-version {
+  align-self: center;
+  text-align: center;
+  padding: 0.3rem 0.85rem;
+  margin-top: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
   color: rgba(242, 246, 251, 0.72);
   font-size: 0.8rem;
   font-weight: 700;
@@ -249,17 +272,22 @@ a {
   gap: 0.8rem;
   color: #f2f6fb;
   font-size: 0.86rem;
-  font-weight: 700;
+  font-weight: 500;
+  padding: 0.9rem 1rem;
+  border-radius: 0.95rem;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .sidebar-footer-link:hover {
-  color: #8ec3ff;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  color: #fff;
+  transform: translateX(2px);
 }
 
 .footer-icon {
-  flex: 0 0 1.65rem;
-  width: 1.65rem;
-  height: 1.65rem;
+  flex: 0 0 1.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -269,15 +297,6 @@ a {
 
 .support-link {
   color: #f2f6fb;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: rgba(90, 166, 255, 0.8);
-  text-underline-offset: 0.18em;
-}
-
-.support-link:hover {
-  color: #8ec3ff;
 }
 
 .main {
@@ -526,17 +545,14 @@ p {
 
 .stat-card.success .stat-icon {
   color: var(--success);
-  stroke-width: 3.5;
 }
 
 .stat-card.warning .stat-icon {
   color: var(--warning);
-  stroke-width: 3;
 }
 
 .stat-card.danger .stat-icon {
   color: var(--danger);
-  stroke-width: 3;
 }
 
 .stat-copy {
@@ -1122,8 +1138,8 @@ p {
 
 .form-grid label:has(input[type="checkbox"]) {
   display: flex;
-  flex-direction: row-reverse;
-  justify-content: flex-end;
+  flex-direction: row;
+  justify-content: flex-start;
   align-items: center;
   gap: 0.55rem;
   min-height: 2rem;
@@ -1133,7 +1149,8 @@ input[type="checkbox"] {
   width: 1.1rem;
   height: 1.1rem;
   margin: 0;
-  justify-self: end;
+  flex: 0 0 1.1rem;
+  order: -1;
   accent-color: var(--accent);
 }
 
@@ -1189,6 +1206,89 @@ input[type="checkbox"] {
   padding: 0.7rem 0.8rem;
   color: var(--text);
   background: rgba(255, 255, 255, 0.8);
+}
+
+.form-grid input[type="checkbox"] {
+  width: 1.1rem;
+  padding: 0;
+}
+
+.form-grid textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid rgba(13, 42, 67, 0.15);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.8);
+  font: 0.85rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.rule-helper {
+  grid-column: 1 / -1;
+  padding: 0.9rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  background: rgba(31, 115, 208, 0.04);
+}
+
+.rule-helper-header,
+.rule-helper-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rule-helper-header {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+
+.rule-helper-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 0.7rem;
+}
+
+.rule-helper label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.rule-helper input,
+.rule-helper select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(13, 42, 67, 0.15);
+  border-radius: 0.6rem;
+  background: white;
+  color: var(--text);
+  font: inherit;
+}
+
+@media (max-width: 760px) {
+  .rule-helper-grid { grid-template-columns: 1fr; }
+  .rule-helper-header { grid-template-columns: 1fr; }
+}
+
+.acknowledge-form {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.acknowledge-form input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(13, 42, 67, 0.15);
+  border-radius: 0.65rem;
+  color: var(--text);
+  background: white;
+  font: inherit;
 }
 
 .detail-actions {

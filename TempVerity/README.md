@@ -46,6 +46,23 @@ version ranges:
 ./update_versions.sh --update
 ```
 
+The frontend check uses `package-lock.json` and reports locked, wanted (within
+declared ranges), and latest registry versions for runtime and development
+dependencies. Checks do not modify the project. npm failures are reported as
+errors rather than being treated as an up-to-date result.
+
+To check or update only the frontend:
+
+```sh
+./update_versions.sh --frontend-only
+./update_versions.sh --frontend-only --update
+```
+
+Updates save both `frontend/package.json` and `frontend/package-lock.json`.
+Major upgrades outside the declared ranges require manual review. Dependency
+lifecycle scripts are disabled during updates; use the normal install/build
+workflow afterwards. Review changes and run the frontend build before deployment.
+
 Use `--python-only` when Node/npm is not installed locally. Rebuild the Docker
 image after applying updates.
 

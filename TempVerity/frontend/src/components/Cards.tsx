@@ -1,3 +1,5 @@
+import { Icon } from "./Icon";
+
 type StatCardProps = {
   label: string;
   value: number | string;
@@ -5,10 +7,7 @@ type StatCardProps = {
 };
 
 function StatIcon({ tone }: { tone: StatCardProps["tone"] }) {
-  if (tone === "success") return <svg className="stat-icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" /><path d="m20 32 8 8 16-17" /></svg>;
-  if (tone === "warning") return <svg className="stat-icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" /><path d="m32 18 16 28H16zM32 28v9M32 42v.1" /></svg>;
-  if (tone === "danger") return <svg className="stat-icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" /><circle cx="24" cy="32" r="2" /><circle cx="32" cy="32" r="2" /><circle cx="40" cy="32" r="2" /></svg>;
-  return <svg className="stat-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 11h28v42H18zM23 18h18M23 27h18M23 36h18M23 45h10" /><path d="M14 53h36" /></svg>;
+  return <Icon className="stat-icon" name={tone === "success" ? "online" : tone === "warning" ? "alarm" : tone === "danger" ? "offline" : "devices"} />;
 }
 
 export function StatCard({ label, value, tone = "neutral" }: StatCardProps) {
@@ -50,9 +49,7 @@ function formatTemperature(value: number | null) {
 }
 
 function DeviceMetricIcon({ kind }: { kind: "temperature" | "door" | "alarm" }) {
-  if (kind === "door") return <svg className="device-metric-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h11v18H6zM17 7h2v10h-2M9 6v12" /></svg>;
-  if (kind === "alarm") return <svg className="device-metric-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16h12l-1.5-2.5V9a4.5 4.5 0 0 0-9 0v4.5zM9.5 19h5" /></svg>;
-  return <svg className="device-metric-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a2 2 0 0 0-2 2v7.2a4 4 0 1 0 4 0V6a2 2 0 0 0-2-2zM12 16v-5" /></svg>;
+  return <Icon className="device-metric-icon" name={kind === "alarm" ? "bell" : kind} />;
 }
 
 export function DeviceCard({ device, expanded = false }: DeviceCardProps) {

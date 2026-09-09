@@ -17,7 +17,7 @@ from .core.config import get_settings
 from .db import Base, SessionLocal, engine, get_db
 from .auth import COOKIE_NAME, auth_enabled, configure_auth, current_user, ensure_admin, login, session_lifetime_minutes
 from .models import Device, User
-from .schemas import AlertRead, AuthConfigure, BootstrapResponse, ControlRequest, DeviceCreate, DeviceSnapshot, DeviceUpdate, EventRead, LoginRequest, NotificationRead, SettingPatch, ZoneSnapshot
+from .schemas import AlertAcknowledge, AlertRead, AuthConfigure, BootstrapResponse, ControlRequest, DeviceCreate, DeviceSnapshot, DeviceUpdate, EventRead, LoginRequest, NotificationRead, SettingPatch, ZoneSnapshot
 from .services import AppService
 
 settings = get_settings()
@@ -49,6 +49,18 @@ def on_startup() -> None:
             columns = {column["name"] for column in inspect(connection).get_columns("users")}
             if "role" not in columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(24) NOT NULL DEFAULT 'admin'"))
+        if "alerts" in inspect(connection).get_table_names():
+            columns = {column["name"] for column in inspect(connection).get_columns("alerts")}
+            additions = {
+                "condition_key": "VARCHAR(160) NOT NULL DEFAULT ''",
+                "recovery_started_at": "DATETIME",
+                "acknowledged_at": "DATETIME",
+                "acknowledged_by": "INTEGER",
+                "acknowledgement_comment": "TEXT",
+            }
+            for name, definition in additions.items():
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE alerts ADD COLUMN {name} {definition}"))
     with SessionLocal() as session:
         service = AppService(session)
         service.seed_if_empty()
@@ -268,7 +280,7 @@ async def refresh_device(device_id: str, service: AppService = Depends(service_f
 
 
 @app.post("/api/devices/{device_id}/controls/{action:path}", response_model=DeviceSnapshot)
-async def control_device(device_id: str, action: str, payload: ControlRequest, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_user)) -> DeviceSnapshot:
+async def control_device(device_id: str, action: str, payload: ControlRequest, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> DeviceSnapshot:
     if settings.read_only:
         raise HTTPException(status_code=403, detail="TempVerity is running in read-only monitoring mode")
     try:
@@ -280,7 +292,7 @@ async def control_device(device_id: str, action: str, payload: ControlRequest, s
 
 
 @app.delete("/api/devices/{device_id}/controls/{action:path}", response_model=DeviceSnapshot)
-async def delete_control(device_id: str, action: str, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_user)) -> DeviceSnapshot:
+async def delete_control(device_id: str, action: str, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> DeviceSnapshot:
     if settings.read_only:
         raise HTTPException(status_code=403, detail="TempVerity is running in read-only monitoring mode")
     try:
@@ -304,6 +316,16 @@ def list_alerts(service: AppService = Depends(service_from_db)) -> list[AlertRea
     return service.list_alerts()
 
 
+@app.post("/api/alerts/{alert_id}/acknowledge", response_model=AlertRead)
+def acknowledge_alert(alert_id: int, payload: AlertAcknowledge, service: AppService = Depends(service_from_db), user: User | None = Depends(require_admin)) -> AlertRead:
+    try:
+        return service.acknowledge_alert(alert_id, user.id if user else None, payload.comment)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Alarm not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get("/api/events", response_model=list[EventRead])
 def list_events(service: AppService = Depends(service_from_db)) -> list[EventRead]:
     return service.list_events()
@@ -325,12 +347,12 @@ def get_settings(service: AppService = Depends(service_from_db), _user: User | N
 
 
 @app.patch("/api/settings/{section}")
-def patch_settings(section: str, payload: SettingPatch, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_user)) -> dict[str, object]:
+def patch_settings(section: str, payload: SettingPatch, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> dict[str, object]:
     return service.patch_settings(section, payload.values)
 
 
 @app.post("/api/settings/smtp/test")
-async def test_smtp(service: AppService = Depends(service_from_db), _user: User | None = Depends(require_user)) -> dict[str, object]:
+async def test_smtp(service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> dict[str, object]:
     return await service.test_smtp()
 
 

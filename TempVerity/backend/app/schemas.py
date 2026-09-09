@@ -75,6 +75,11 @@ class AlertRead(BaseModel):
     grace_minutes: int
     activated_at: datetime
     resolved_at: datetime | None
+    condition_key: str = ""
+    recovery_started_at: datetime | None = None
+    acknowledged_at: datetime | None = None
+    acknowledged_by: int | None = None
+    acknowledgement_comment: str | None = None
 
 
 class SettingPatch(BaseModel):
@@ -105,6 +110,10 @@ class DeviceUpdate(BaseModel):
 
 class ControlRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AlertAcknowledge(BaseModel):
+    comment: str = Field(default="", max_length=2000)
 
 
 class LoginRequest(BaseModel):
