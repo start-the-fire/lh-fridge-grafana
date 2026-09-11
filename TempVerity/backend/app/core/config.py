@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "TempVerity"
-    app_version: str = "1.0.0"
+    app_version: str = "1.4.0"
     support_email: str = "placeholder@placeholder.com"  # Replace via TEMPVERITY_SUPPORT_EMAIL before deployment.
     grafana_url: str = ""
     db_path: Path = Field(default=Path("./tempverity.sqlite3"))
@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     admin_password: str = "change-me-before-enabling-auth"
     session_lifetime_days: int = 30
     read_only: bool = True
+    influx_enabled: bool = False
+    influx_url: str = ""
+    influx_org: str = ""
+    influx_bucket: str = ""
+    influx_token: str = ""
+    grafana_embeds_enabled: bool = True
 
 
 @lru_cache(maxsize=1)

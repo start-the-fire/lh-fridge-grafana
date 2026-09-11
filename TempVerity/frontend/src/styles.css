@@ -164,6 +164,22 @@ a {
   transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
+.nav-link.child {
+  margin-top: -0.25rem;
+  margin-left: 1.25rem;
+  padding-block: 0.65rem;
+  padding-left: 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.88rem;
+  color: rgba(242, 246, 251, 0.7);
+}
+
+.nav-link.child .nav-icon {
+  flex-basis: 1.05rem;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
 .nav-icon {
   flex: 0 0 1.35rem;
   width: 1.35rem;
@@ -200,6 +216,11 @@ a {
 .sidebar.collapsed .nav-link {
   justify-content: center;
   padding-inline: 0.7rem;
+}
+
+.sidebar.collapsed .nav-link.child {
+  margin-left: 0;
+  padding-block: 0.75rem;
 }
 
 .sidebar.collapsed .nav-label,
@@ -501,6 +522,12 @@ p {
   color: var(--danger);
 }
 
+.banner.warning {
+  color: #996007;
+  background: #fff8ea;
+  border-color: #f2cf8a;
+}
+
 .readonly-banner {
   color: var(--accent-2);
   background: rgba(31, 115, 208, 0.08);
@@ -768,8 +795,8 @@ p {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
     "monitoring smtp"
-    "login smtp"
-    "alerts smtp";
+    "alerts smtp"
+    "login smtp";
   gap: 1rem;
   align-items: start;
 }
@@ -782,6 +809,57 @@ p {
 .settings-grid > :nth-child(2) { grid-area: smtp; }
 .settings-grid > :nth-child(3) { grid-area: alerts; }
 .settings-grid > :nth-child(4) { grid-area: login; }
+
+.settings-detail-panel {
+  max-width: 920px;
+}
+
+.settings-detail-stack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  max-width: 1600px;
+  align-items: start;
+}
+
+.settings-detail-stack .settings-detail-panel {
+  max-width: none;
+}
+
+.grafana-embed-panel {
+  grid-column: 1 / -1;
+}
+
+.grafana-card-form {
+  grid-template-columns: 1fr;
+}
+
+.grafana-card-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.grafana-card-editor .secondary-button {
+  justify-self: start;
+}
+
+.grafana-embed-panel iframe {
+  width: 100%;
+  min-height: 620px;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: #101217;
+}
+
+.grafana-embed-note {
+  margin: -0.25rem 0 0.75rem;
+}
 
 .device-card-body {
   padding: 1rem;
@@ -1547,6 +1625,10 @@ input[type="checkbox"] {
   .about-grid {
     grid-template-columns: 1fr;
   }
+
+  .settings-detail-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -1587,6 +1669,14 @@ input[type="checkbox"] {
       "smtp"
       "alerts"
       "login";
+  }
+
+  .settings-detail-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .grafana-card-editor {
+    grid-template-columns: 1fr;
   }
 
   .device-card.expanded {

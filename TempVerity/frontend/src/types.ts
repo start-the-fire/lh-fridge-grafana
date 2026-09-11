@@ -98,10 +98,28 @@ export type HealthResponse = {
   read_only: boolean;
 };
 
+export type HistoricalDataStatus = {
+  state: "disabled" | "missing_config" | "bucket_missing" | "unreachable" | "ok" | string;
+  message: string;
+  enabled: boolean;
+  intervalMinutes: number;
+  reportEnabled: boolean;
+  reportFrequency: string;
+  reportRecipients: string[] | string;
+  lastReportSentAt: string | null;
+  lastReportStatus: string | null;
+  lastReportPeriodKey: string | null;
+  allReportRequestedAt: string | null;
+  nextReportAt: string | null;
+  lastWriteAt: string | null;
+  bucket: string | null;
+};
+
 export type AppMetadata = {
   version: string;
   support_email: string;
   grafana_url: string;
+  grafana_embeds_enabled: boolean;
 };
 
 export type AuthStatus = {

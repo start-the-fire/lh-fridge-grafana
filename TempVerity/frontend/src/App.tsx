@@ -7,7 +7,7 @@ import { fetchJson } from "./api/client";
 import { Header } from "./components/Header";
 import { DeviceCard, StatCard } from "./components/Cards";
 import { Sidebar } from "./components/Sidebar";
-import type { AlertRead, AuthStatus, BootstrapResponse, DeviceSnapshot, EventRead, HealthResponse, NotificationRead } from "./types";
+import type { AlertRead, AppMetadata, AuthStatus, BootstrapResponse, DeviceSnapshot, EventRead, HealthResponse, HistoricalDataStatus, NotificationRead } from "./types";
 
 function humanStatus(status: string): string {
   return ({ success: "Successful", failed: "Failed", pending: "Pending", active: "Active", recovery: "Recovering", resolved: "Resolved" } as Record<string, string>)[status] ?? status.replace(/[-_]/g, " ");
@@ -220,7 +220,17 @@ function AboutPage() {
       <section className="panel">
         <div className="panel-header"><h2 className="section-title"><Icon name="settings" />How it works</h2></div>
         <p>TempVerity polls each configured appliance through its local API, stores the latest reported state locally, and evaluates available readings against configured software alarm rules. Update frequency depends on the polling interval and device connectivity.</p>
-        <p>Local monitoring runs independently of external reporting services. The existing InfluxDB, Grafana, and export tools remain separate; further integration is planned for V2.</p>
+        <p>Current-state monitoring, historical storage, reporting, and alert delivery can be configured independently so routine visibility and long-term records can use different intervals.</p>
+      </section>
+      <section className="panel">
+        <div className="panel-header"><h2 className="section-title"><Icon name="reports" />Historical data</h2></div>
+        <p>TempVerity can write long-term appliance samples to a dedicated InfluxDB bucket while keeping application state in its local database. Historical writes use their own interval and store one sample per reported device zone.</p>
+        <p>Grafana dashboard links can be added on the Historical Data page. Embedded dashboard cards are loaded only when that page is opened and can be hidden entirely through the deployment environment.</p>
+      </section>
+      <section className="panel">
+        <div className="panel-header"><h2 className="section-title"><Icon name="mail" />Email reports</h2></div>
+        <p>Scheduled historical reports can be generated from InfluxDB data and delivered as email attachments. Reports include CSV data and a PDF summary with temperature trends.</p>
+        <p>Report frequency and recipients are configured on the Historical Data page. Sender address, SMTP host, credentials, and transport security are reused from the SMTP notification settings.</p>
       </section>
       <section className="panel">
         <div className="panel-header"><h2 className="section-title"><Icon name="bell" />Alerts and notifications</h2></div>
@@ -301,7 +311,7 @@ function SettingsPage() {
     const divisor = sessionUnit === "months" ? 60 * 24 * 30 : sessionUnit === "days" ? 60 * 24 : 60;
     setAuth({ enabled: Boolean(currentAuth.enabled), dashboardRequiresAuth: Boolean(currentAuth.dashboardRequiresAuth), sessionValue: Math.max(1, Math.round(sessionMinutes / divisor)), sessionUnit, adminPassword: "", viewerPassword: "" });
   }, [settings]);
-  const save = useMutation({ mutationFn: ({ section, values }: { section: string; values: Record<string, unknown> }) => fetchJson(`/api/settings/${section}`, { method: "PATCH", body: JSON.stringify({ values }) }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings"] }) });
+  const save = useMutation({ mutationFn: ({ section, values }: { section: string; values: Record<string, unknown> }) => fetchJson(`/api/settings/${section}`, { method: "PATCH", body: JSON.stringify({ values }) }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["settings"] }); void queryClient.invalidateQueries({ queryKey: ["historical-data-status"] }); } });
   const smtpTest = useMutation({ mutationFn: () => fetchJson<{ ok: boolean; message: string }>("/api/settings/smtp/test", { method: "POST" }) });
   const saveSmtp = (event: FormEvent) => { event.preventDefault(); save.mutate({ section: "smtp", values: { ...smtp, port: Number(smtp.port), password: smtp.password || undefined, recipients: smtp.recipients.split(",").map((item) => item.trim()).filter(Boolean) } }); };
   const saveAlerts = (event: FormEvent) => { event.preventDefault(); try { const softwareRules = JSON.parse(softwareRulesText); if (!Array.isArray(softwareRules)) throw new Error("Software alarm rules must be a JSON array."); setSoftwareRulesError(""); save.mutate({ section: "alerts", values: { ...alerts, softwareRules } }); } catch (error) { setSoftwareRulesError(error instanceof Error ? error.message : "Invalid software alarm rules."); } };
@@ -327,6 +337,110 @@ function SettingsPage() {
       <section className="panel"><div className="panel-header"><h2 className="section-title"><Icon name="lock" />Login access</h2><span className="muted">Optional administrator and viewer access</span></div><form className="form-grid" onSubmit={saveAuth}><label><span className="setting-label">Enable login <HelpIndicator text="When enabled, users must enter either the administrator or view-only password before accessing TempVerity." /></span><input type="checkbox" checked={auth.enabled} onChange={(event) => setAuth({ ...auth, enabled: event.target.checked })} /></label><label><span className="setting-label">Require login for dashboard <HelpIndicator text="Protects the dashboard when login is enabled. It has no effect while login is disabled." /></span><input type="checkbox" checked={auth.dashboardRequiresAuth} onChange={(event) => setAuth({ ...auth, dashboardRequiresAuth: event.target.checked })} /></label><label><span className="setting-label">Session duration <HelpIndicator text="How long a successful login remains active in this browser before the user must sign in again." /></span><input type="number" min="1" value={auth.sessionValue} onChange={(event) => setAuth({ ...auth, sessionValue: Number(event.target.value) })} /></label><label><span className="setting-label">Duration unit <HelpIndicator text="The unit used for the session duration: hours, days, or months. A month is treated as 30 days." /></span><select value={auth.sessionUnit} onChange={(event) => setAuth({ ...auth, sessionUnit: event.target.value })}><option value="hours">Hours</option><option value="days">Days</option><option value="months">Months</option></select></label><label><span className="setting-label">Administrator password <HelpIndicator text="Password for full access, including Devices and Settings. Leave blank to keep the current password." /></span><input type="password" value={auth.adminPassword} onChange={(event) => setAuth({ ...auth, adminPassword: event.target.value })} placeholder="Leave blank to keep current password" autoComplete="new-password" /></label><label><span className="setting-label">View-only password <HelpIndicator text="Password for monitoring access only. View-only users can see the dashboard, alarms, events, and reports, but not Devices or Settings." /></span><input type="password" value={auth.viewerPassword} onChange={(event) => setAuth({ ...auth, viewerPassword: event.target.value })} placeholder="Leave blank to keep current password" autoComplete="new-password" /></label><p className="muted">When login is enabled, all application pages require a password. The view-only account can see monitoring, alarms, events, and reports, but not Devices or Settings.</p><button className="primary-button" type="submit">Save login settings</button></form></section>
       <section className="panel software-rules-panel"><div className="panel-header"><h2 className="section-title"><Icon name="code" />Software alarm rules (JSON)</h2></div><div className="form-grid"><label>Advanced rule configuration<textarea form="alert-settings" rows={14} value={softwareRulesText} onChange={(event) => setSoftwareRulesText(event.target.value)} spellCheck={false} /></label><button className="primary-button" form="alert-settings" type="submit" disabled={save.isPending}>Save alert settings</button></div></section>
     </div>{isLoading ? <div className="banner">Loading settings...</div> : null}
+  </PageFrame>;
+}
+
+function HistoricalDataPage() {
+  const queryClient = useQueryClient();
+  const { data: settings, isLoading } = useQuery({ queryKey: ["settings"], queryFn: () => fetchJson<Record<string, Record<string, unknown>>>("/api/settings") });
+  const { data: historicalStatus } = useQuery({ queryKey: ["historical-data-status"], queryFn: () => fetchJson<HistoricalDataStatus>("/api/settings/historical-data/status"), refetchInterval: 30000 });
+  const { data: metadata } = useQuery({ queryKey: ["metadata"], queryFn: () => fetchJson<AppMetadata>("/api/metadata") });
+  const grafanaEmbedsEnabled = metadata?.grafana_embeds_enabled !== false;
+  const [historicalData, setHistoricalData] = useState({ enabled: false, intervalMinutes: 60 });
+  const [reportSettings, setReportSettings] = useState({ reportEnabled: false, reportFrequency: "monthly", reportRecipients: "" });
+  const [grafanaCards, setGrafanaCards] = useState<{ title: string; url: string }[]>([]);
+  useEffect(() => {
+    const currentHistoricalData = settings?.historicalData ?? {};
+    setHistoricalData({ enabled: Boolean(currentHistoricalData.enabled), intervalMinutes: Number(currentHistoricalData.intervalMinutes ?? 60) });
+    setReportSettings({
+      reportEnabled: Boolean(currentHistoricalData.reportEnabled),
+      reportFrequency: String(currentHistoricalData.reportFrequency ?? "monthly"),
+      reportRecipients: Array.isArray(currentHistoricalData.reportRecipients) ? currentHistoricalData.reportRecipients.join(", ") : String(currentHistoricalData.reportRecipients ?? ""),
+    });
+    const cards = Array.isArray(currentHistoricalData.grafanaCards) ? currentHistoricalData.grafanaCards : [];
+    setGrafanaCards(cards.map((card) => {
+      const value = card as Record<string, unknown>;
+      return { title: String(value.title ?? "Grafana dashboard"), url: String(value.url ?? "") };
+    }).filter((card) => card.url || card.title));
+  }, [settings]);
+  const save = useMutation({
+    mutationFn: (values: Record<string, unknown>) => fetchJson("/api/settings/historicalData", { method: "PATCH", body: JSON.stringify({ values }) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["historical-data-status"] });
+    },
+  });
+  const sendReport = useMutation({ mutationFn: () => fetchJson<{ ok: boolean; message: string }>("/api/settings/historical-data/report", { method: "POST" }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["historical-data-status"] }); void queryClient.invalidateQueries({ queryKey: ["events"] }); } });
+  const saveHistoricalData = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate({ enabled: historicalData.enabled, intervalMinutes: Math.max(1, Number(historicalData.intervalMinutes)) });
+  };
+  const saveReports = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate({
+      reportEnabled: reportSettings.reportEnabled,
+      reportFrequency: reportSettings.reportFrequency,
+      reportRecipients: reportSettings.reportRecipients.split(",").map((item) => item.trim()).filter(Boolean),
+    });
+  };
+  const saveGrafanaCards = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate({ grafanaCards: grafanaCards.map((card) => ({ title: card.title.trim() || "Grafana dashboard", url: card.url.trim() })).filter((card) => card.url) });
+  };
+  const addGrafanaCard = () => setGrafanaCards([...grafanaCards, { title: "Grafana dashboard", url: "" }]);
+  const updateGrafanaCard = (index: number, values: Partial<{ title: string; url: string }>) => setGrafanaCards(grafanaCards.map((card, cardIndex) => cardIndex === index ? { ...card, ...values } : card));
+  const removeGrafanaCard = (index: number) => setGrafanaCards(grafanaCards.filter((_, cardIndex) => cardIndex !== index));
+  const reportsReady = historicalStatus?.state === "ok";
+  const reportBadgeTone = !reportSettings.reportEnabled ? "stale" : reportsReady ? "ok" : "warning";
+  const reportBadgeLabel = !reportSettings.reportEnabled ? "disabled" : reportsReady ? "enabled" : "history required";
+  return <PageFrame title="Historical Data" body="Long-term temperature and appliance-state storage for Grafana and reporting. Connection details are provided by Docker Compose environment variables.">
+    <div className="settings-detail-stack">
+    <section className="panel settings-detail-panel">
+      <div className="panel-header"><div><h2 className="section-title"><Icon name="mail" />Email reports</h2><span className="muted">Uses the SMTP sender configured in Settings</span></div><span className={`status-pill ${reportBadgeTone}`}>{reportBadgeLabel}</span></div>
+      <form className="form-grid" onSubmit={saveReports}>
+        <label>Enabled<input type="checkbox" checked={reportSettings.reportEnabled} onChange={(event) => setReportSettings({ ...reportSettings, reportEnabled: event.target.checked })} /></label>
+        <label>Export frequency<select value={reportSettings.reportFrequency} onChange={(event) => setReportSettings({ ...reportSettings, reportFrequency: event.target.value })}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="all">All</option></select></label>
+        <label>Target email address(es)<input type="text" value={reportSettings.reportRecipients} onChange={(event) => setReportSettings({ ...reportSettings, reportRecipients: event.target.value })} placeholder="lab@example.com, qa@example.com" /></label>
+        {reportSettings.reportEnabled && !reportsReady ? <div className="banner warning">Email reports are enabled, but cannot run until the InfluxDB history connection is healthy. Current history status: {humanStatus(historicalStatus?.state ?? "checking")}.</div> : null}
+        {reportSettings.reportEnabled && reportsReady ? <p className="muted">Next scheduled report: {historicalStatus?.nextReportAt ? new Date(historicalStatus.nextReportAt).toLocaleString() : "Not calculated"}</p> : null}
+        {reportSettings.reportEnabled && historicalStatus?.lastReportSentAt ? <p className="muted">Last report: {new Date(historicalStatus.lastReportSentAt).toLocaleString()}</p> : null}
+        {reportSettings.reportEnabled && reportsReady ? <p className="muted">{reportSettings.reportFrequency === "all" ? "All exports are sent at the next midnight run and then switch automatically to quarterly." : "Manual sending uses the last completed calendar period for the selected frequency."}</p> : null}
+        {reportSettings.reportEnabled && (historicalStatus?.lastReportStatus || sendReport.data?.message) ? <p className="muted">{historicalStatus?.lastReportStatus ?? sendReport.data?.message}</p> : null}
+        <button className="primary-button" type="submit" disabled={save.isPending}>{save.isPending ? "Saving..." : "Save report settings"}</button>
+        {reportSettings.reportEnabled && reportsReady ? <button className="secondary-button" type="button" onClick={() => sendReport.mutate()} disabled={sendReport.isPending || reportSettings.reportFrequency === "all"}>{sendReport.isPending ? "Sending..." : reportSettings.reportFrequency === "all" ? "Scheduled overnight" : "Send report now"}</button> : null}
+      </form>
+      {sendReport.error ? <div className="banner error">Report delivery failed.</div> : null}
+    </section>
+    <section className="panel settings-detail-panel">
+      <div className="panel-header"><div><h2 className="section-title"><Icon name="reports" />InfluxDB history</h2><span className="muted">{historicalStatus?.bucket ? `Bucket: ${historicalStatus.bucket}` : "InfluxDB connection from environment"}</span></div><span className={`status-pill ${historicalStatus?.state === "ok" ? "ok" : historicalStatus?.state === "disabled" ? "stale" : "danger"}`}>{humanStatus(historicalStatus?.state ?? "checking")}</span></div>
+      <form className="form-grid" onSubmit={saveHistoricalData}>
+        <label>Enabled<input type="checkbox" checked={historicalData.enabled} onChange={(event) => setHistoricalData({ ...historicalData, enabled: event.target.checked })} /></label>
+        <label>Write interval minutes<input type="number" min="1" max="1440" value={historicalData.intervalMinutes} onChange={(event) => setHistoricalData({ ...historicalData, intervalMinutes: Number(event.target.value) })} /></label>
+        <p className="muted">{historicalStatus?.message ?? "Checking historical data status..."}</p>
+        <p className="muted">Last successful write: {historicalStatus?.lastWriteAt ? new Date(historicalStatus.lastWriteAt).toLocaleString() : "None recorded"}</p>
+        <button className="primary-button" type="submit" disabled={save.isPending}>{save.isPending ? "Saving..." : "Save historical data settings"}</button>
+      </form>
+      {isLoading ? <div className="banner">Loading historical data settings...</div> : null}
+    </section>
+    {grafanaEmbedsEnabled ? <section className="panel settings-detail-panel grafana-embed-settings">
+      <div className="panel-header"><div><h2 className="section-title"><Icon name="reports" />Grafana embeds</h2><span className="muted">{grafanaCards.length} configured card{grafanaCards.length === 1 ? "" : "s"}</span></div><button className="secondary-button" type="button" onClick={addGrafanaCard}>Add card</button></div>
+      <form className="form-grid grafana-card-form" onSubmit={saveGrafanaCards}>
+        <p className="muted">Embedded dashboards require Grafana to allow iframe display. If the browser blocks the card, enable embedding in Grafana or use Open.</p>
+        {grafanaCards.length === 0 ? <p className="muted">Add a shared Grafana dashboard URL to show it below.</p> : null}
+        {grafanaCards.map((card, index) => <div className="grafana-card-editor" key={index}>
+          <label>Card title<input value={card.title} onChange={(event) => updateGrafanaCard(index, { title: event.target.value })} /></label>
+          <label>Shared dashboard URL<input type="url" value={card.url} onChange={(event) => updateGrafanaCard(index, { url: event.target.value })} placeholder="https://monitor.example/public-dashboards/..." /></label>
+          <button className="secondary-button" type="button" onClick={() => removeGrafanaCard(index)}>Remove</button>
+        </div>)}
+        <button className="primary-button" type="submit" disabled={save.isPending}>{save.isPending ? "Saving..." : "Save Grafana embeds"}</button>
+      </form>
+    </section> : null}
+    {grafanaEmbedsEnabled ? grafanaCards.filter((card) => card.url.trim()).map((card, index) => <section className="panel settings-detail-panel grafana-embed-panel" key={`${card.url}-${index}`}>
+      <div className="panel-header"><h2 className="section-title"><Icon name="reports" />{card.title || "Grafana dashboard"}</h2><a className="secondary-button" href={card.url} target="_blank" rel="noreferrer">Open</a></div>
+      <p className="muted grafana-embed-note">If this dashboard is blocked here, Grafana is sending frame-protection headers. Open it in a new tab or enable embedding on the Grafana server.</p>
+      <iframe title={card.title || `Grafana dashboard ${index + 1}`} src={card.url} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+    </section>) : null}
+    </div>
   </PageFrame>;
 }
 
@@ -504,6 +618,7 @@ export function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings/historical-data" element={<HistoricalDataPage />} />
       </Routes></AuthGate>
     </BrowserRouter>
   );

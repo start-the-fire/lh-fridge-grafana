@@ -11,6 +11,7 @@ const items = [
   { to: "/events", label: "Events", icon: "events" },
   { to: "/reports", label: "Reports", icon: "reports" },
   { to: "/settings", label: "Settings", icon: "settings" },
+  { to: "/settings/historical-data", label: "Historical Data", icon: "reports", child: true },
 ];
 
 type SidebarIconName = (typeof items)[number]["icon"];
@@ -36,7 +37,7 @@ export function Sidebar() {
   const { data: metadata } = useQuery({ queryKey: ["metadata"], queryFn: () => fetchJson<AppMetadata>("/api/metadata") });
   const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: () => fetchJson<AuthStatus>("/api/auth/status") });
   const supportEmail = metadata?.support_email ?? "placeholder@placeholder.com";
-  const visibleItems = auth?.role === "viewer" ? items.filter((item) => !["/devices", "/settings"].includes(item.to)) : items;
+  const visibleItems = auth?.role === "viewer" ? items.filter((item) => !["/devices", "/settings", "/settings/historical-data"].includes(item.to)) : items;
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
       <div className="brand">
@@ -51,9 +52,9 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === "/"}
+            end={item.to === "/" || item.to === "/settings"}
             title={item.label}
-            className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+            className={({ isActive }) => `nav-link${item.child ? " child" : ""}${isActive ? " active" : ""}`}
           >
             <SidebarIcon name={item.icon} /><span className="nav-label">{item.label}</span>
           </NavLink>

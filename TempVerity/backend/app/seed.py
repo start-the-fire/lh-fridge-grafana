@@ -38,6 +38,7 @@ def seed_settings() -> list[Setting]:
             value_json='{"enabled":false,"from":"alerts@example.invalid","host":"localhost","port":587,"security":"STARTTLS","recipients":[]}',
         ),
         Setting(key="alerts", value_json='{"connectivityGraceMinutes":10,"alarmGraceMinutes":5,"recovery":true,"repeat":false}'),
+        Setting(key="historicalData", value_json='{"enabled":false,"intervalMinutes":60,"reportEnabled":false,"reportFrequency":"monthly","reportRecipients":[],"grafanaCards":[]}'),
         Setting(key="integrations", value_json='{"influxEnabled":false,"grafanaEnabled":false}'),
     ]
 

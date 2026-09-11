@@ -14,8 +14,10 @@ import aiosmtplib
 from .adapters import DemoAdapter, LiebherrAdapter
 from .core.config import get_settings
 from .models import Alert, ControlAction, Device, Event, Notification, Setting
+from .reporting import next_report_due, next_report_time, report_period_key, send_report
 from .schemas import AlertRead, BootstrapResponse, DeviceCreate, DeviceSnapshot, DeviceUpdate, EventRead, ZoneSnapshot
 from .seed import seed_alerts, seed_devices, seed_events, seed_settings
+from .timeseries import HistoricalDataWriter
 
 
 class AppService:
@@ -274,6 +276,7 @@ class AppService:
             device.last_seen_at = now
             device.state_json = json.dumps(state_json)
             self._apply_alerts(device, state_json, now)
+            self._write_historical_data_if_due(device, state_json, now)
             self.session.add(Event(device_id=device.id, kind="poll", status="success", detail="Device state refreshed", created_at=now))
             self.session.commit()
         except Exception as exc:
@@ -287,6 +290,32 @@ class AppService:
             if close is not None:
                 await close()
         return self._device_snapshot(device)
+
+    def _write_historical_data_if_due(self, device: Device, state: dict[str, object], now: datetime) -> None:
+        historical_settings = self._settings_dict().get("historicalData", {})
+        if not isinstance(historical_settings, dict) or historical_settings.get("enabled") is not True:
+            return
+        interval_minutes = max(1, int(historical_settings.get("intervalMinutes", 60)))
+        previous_value = state.get("last_historical_write_at")
+        if isinstance(previous_value, str):
+            try:
+                previous = datetime.fromisoformat(previous_value)
+                if previous.tzinfo is None:
+                    previous = previous.replace(tzinfo=timezone.utc)
+                if (now - previous).total_seconds() < interval_minutes * 60:
+                    return
+            except ValueError:
+                pass
+        try:
+            result = HistoricalDataWriter(get_settings()).write_device_state(device, state, now)
+            if result.get("ok"):
+                state["last_historical_write_at"] = now.isoformat()
+                device.state_json = json.dumps(state)
+                self.session.add(Event(device_id=device.id, kind="historical-data", status="success", detail=f"Historical sample written to InfluxDB ({result.get('points', 0)} zone points)", created_at=now))
+            elif not result.get("skipped"):
+                self.session.add(Event(device_id=device.id, kind="historical-data", status="failed", detail=str(result.get("message", "Historical write failed")), created_at=now))
+        except Exception as exc:
+            self.session.add(Event(device_id=device.id, kind="historical-data", status="failed", detail=f"InfluxDB write failed: {type(exc).__name__}", created_at=now))
 
     async def _ensure_model_image(self, device: Device) -> None:
         """Attach a bundled official product image after model discovery."""
@@ -501,10 +530,88 @@ class AppService:
             settings["smtp"] = {**smtp, "password": "configured"}
         return settings
 
+    def historical_data_status(self) -> dict[str, object]:
+        values = self._settings_dict().get("historicalData", {})
+        values = values if isinstance(values, dict) else {}
+        status = HistoricalDataWriter(get_settings()).status()
+        last_write = None
+        for device in self.session.scalars(select(Device)).all():
+            state = self._parse_state(device)
+            value = state.get("last_historical_write_at")
+            if isinstance(value, str) and (last_write is None or value > last_write):
+                last_write = value
+        app_settings = get_settings()
+        return {
+            **status,
+            "enabled": values.get("enabled") is True,
+            "intervalMinutes": int(values.get("intervalMinutes", 60)),
+            "reportEnabled": values.get("reportEnabled") is True,
+            "reportFrequency": str(values.get("reportFrequency", "monthly")),
+            "reportRecipients": values.get("reportRecipients", []),
+            "lastReportSentAt": values.get("lastReportSentAt"),
+            "lastReportStatus": values.get("lastReportStatus"),
+            "lastReportPeriodKey": values.get("lastReportPeriodKey"),
+            "allReportRequestedAt": values.get("allReportRequestedAt"),
+            "nextReportAt": next_report_time(str(values.get("reportFrequency", "monthly"))).isoformat(),
+            "lastWriteAt": last_write,
+            "bucket": app_settings.influx_bucket or None,
+        }
+
+    async def send_historical_report(self, *, manual: bool = True) -> dict[str, object]:
+        settings = self._settings_dict()
+        historical = settings.get("historicalData", {})
+        smtp = settings.get("smtp", {})
+        if not isinstance(historical, dict):
+            historical = {}
+        if not isinstance(smtp, dict):
+            smtp = {}
+        if not manual and historical.get("reportEnabled") is not True:
+            return {"ok": False, "skipped": True, "message": "Report delivery disabled"}
+        if manual and historical.get("reportFrequency") == "all":
+            return {"ok": False, "skipped": True, "message": "All-data reports are sent at the next midnight run"}
+        result = await send_report(get_settings(), smtp, {
+            "frequency": historical.get("reportFrequency", "monthly"),
+            "recipients": historical.get("reportRecipients", []),
+        })
+        now = datetime.now(timezone.utc)
+        current = dict(historical)
+        current["lastReportStatus"] = result.get("message", "Report processed")
+        if result.get("ok"):
+            current["lastReportSentAt"] = now.isoformat()
+            frequency = str(historical.get("reportFrequency", "monthly"))
+            current["lastReportPeriodKey"] = report_period_key(frequency, now)
+            if frequency == "all":
+                current["reportFrequency"] = "quarterly"
+                current["lastReportStatus"] = "All-data report sent; frequency changed to quarterly"
+            self.session.add(Event(device_id=None, kind="historical-report", status="success", detail="Historical report email sent", created_at=now))
+        else:
+            self.session.add(Event(device_id=None, kind="historical-report", status="failed", detail=str(result.get("message", "Historical report failed")), created_at=now))
+        setting = self.session.get(Setting, "historicalData")
+        if setting is None:
+            setting = Setting(key="historicalData", value_json=json.dumps(current))
+        else:
+            setting.value_json = json.dumps(current)
+        self.session.add(setting)
+        self.session.commit()
+        return result
+
+    async def process_historical_reports(self) -> None:
+        historical = self._settings_dict().get("historicalData", {})
+        if not isinstance(historical, dict) or historical.get("reportEnabled") is not True:
+            return
+        frequency = str(historical.get("reportFrequency", "monthly"))
+        last_period_key = historical.get("lastReportPeriodKey")
+        requested_at = historical.get("allReportRequestedAt")
+        if next_report_due(frequency, str(last_period_key) if last_period_key else None, requested_at=str(requested_at) if requested_at else None):
+            await self.send_historical_report(manual=False)
+
     def patch_settings(self, section: str, values: Mapping[str, object]) -> dict[str, object]:
         setting = self.session.get(Setting, section)
         if setting is None:
-            setting = Setting(key=section, value_json=json.dumps(dict(values)))
+            safe_values = dict(values)
+            if section == "historicalData" and safe_values.get("reportFrequency") == "all":
+                safe_values["allReportRequestedAt"] = datetime.now(timezone.utc).isoformat()
+            setting = Setting(key=section, value_json=json.dumps(safe_values))
         else:
             current = json.loads(setting.value_json)
             if not isinstance(current, dict):
@@ -512,6 +619,8 @@ class AppService:
             safe_values = dict(values)
             if section == "smtp" and not str(safe_values.get("password", "")).strip():
                 safe_values.pop("password", None)
+            if section == "historicalData" and safe_values.get("reportFrequency") == "all" and current.get("reportFrequency") != "all":
+                safe_values["allReportRequestedAt"] = datetime.now(timezone.utc).isoformat()
             current.update(safe_values)
             setting.value_json = json.dumps(current)
         self.session.add(setting)

@@ -1,0 +1,4 @@
+services:
+  tempverity:
+    ports: !override
+      - "8081:8000"

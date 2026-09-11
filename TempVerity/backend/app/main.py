@@ -27,6 +27,7 @@ SUPPORT_EMAIL = settings.support_email
 app = FastAPI(title=settings.app_name, version=APP_VERSION)
 poller_task: asyncio.Task[None] | None = None
 notification_task: asyncio.Task[None] | None = None
+historical_report_task: asyncio.Task[None] | None = None
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -115,6 +116,22 @@ async def start_notifications() -> None:
     notification_task = asyncio.create_task(notification_loop())
 
 
+async def historical_report_loop() -> None:
+    while True:
+        try:
+            with SessionLocal() as session:
+                await AppService(session).process_historical_reports()
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
+
+
+@app.on_event("startup")
+async def start_historical_reports() -> None:
+    global historical_report_task
+    historical_report_task = asyncio.create_task(historical_report_loop())
+
+
 @app.on_event("shutdown")
 async def stop_poller() -> None:
     if poller_task is not None:
@@ -125,6 +142,10 @@ async def stop_poller() -> None:
         notification_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await notification_task
+    if historical_report_task is not None:
+        historical_report_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await historical_report_task
 
 
 def service_from_db(db: Session = Depends(get_db)) -> AppService:
@@ -199,8 +220,8 @@ def health(db: Session = Depends(get_db)) -> dict[str, object]:
 
 
 @app.get("/api/metadata")
-def metadata() -> dict[str, str]:
-    return {"version": APP_VERSION, "support_email": SUPPORT_EMAIL, "grafana_url": settings.grafana_url}
+def metadata() -> dict[str, object]:
+    return {"version": APP_VERSION, "support_email": SUPPORT_EMAIL, "grafana_url": settings.grafana_url, "grafana_embeds_enabled": settings.grafana_embeds_enabled}
 
 
 @app.get("/api/bootstrap", response_model=BootstrapResponse)
@@ -349,6 +370,16 @@ def get_settings(service: AppService = Depends(service_from_db), _user: User | N
 @app.patch("/api/settings/{section}")
 def patch_settings(section: str, payload: SettingPatch, service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> dict[str, object]:
     return service.patch_settings(section, payload.values)
+
+
+@app.get("/api/settings/historical-data/status")
+def historical_data_status(service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> dict[str, object]:
+    return service.historical_data_status()
+
+
+@app.post("/api/settings/historical-data/report")
+async def send_historical_report(service: AppService = Depends(service_from_db), _user: User | None = Depends(require_admin)) -> dict[str, object]:
+    return await service.send_historical_report()
 
 
 @app.post("/api/settings/smtp/test")
