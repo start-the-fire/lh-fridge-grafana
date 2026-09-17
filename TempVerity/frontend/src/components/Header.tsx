@@ -1,4 +1,5 @@
 import { useTranslation } from "../i18n";
+import { parseBackendDate } from "../date";
 
 type HeaderProps = {
   greeting: string;
@@ -10,7 +11,7 @@ type HeaderProps = {
 
 export function Header({ greeting, description = "Current status, state cache, and device controls in one place.", generatedAt, onRefresh, isRefreshing }: HeaderProps) {
   const { t } = useTranslation();
-  const date = new Date(generatedAt);
+  const date = parseBackendDate(generatedAt);
   return (
     <header className="header">
       <div>

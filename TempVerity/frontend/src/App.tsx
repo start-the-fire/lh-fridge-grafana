@@ -8,6 +8,7 @@ import { Header } from "./components/Header";
 import { DeviceCard, StatCard } from "./components/Cards";
 import { Sidebar } from "./components/Sidebar";
 import { useTranslation } from "./i18n";
+import { parseBackendDate } from "./date";
 import type { AlertRead, AppMetadata, AuthStatus, BootstrapResponse, DeviceSnapshot, EventRead, HealthResponse, HistoricalDataStatus, NotificationRead } from "./types";
 
 function humanStatus(status: string, t: (text: string) => string): string {
@@ -142,7 +143,7 @@ function Dashboard() {
             <div className="list">
               {dashboardEvents.map((event) => (
                 <div key={event.id} className="list-row recent-event-row">
-                  <time dateTime={event.created_at}>{new Date(event.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</time>
+                  <time dateTime={event.created_at}>{parseBackendDate(event.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</time>
                   <div>
                     <strong>{eventTitle(event, t)}</strong>
                     <div className="muted">{eventContext(event, t)} | {humanStatus(event.status, t)}</div>
@@ -412,8 +413,8 @@ function HistoricalDataPage() {
         <label>{t("Export frequency")}<select value={reportSettings.reportFrequency} onChange={(event) => setReportSettings({ ...reportSettings, reportFrequency: event.target.value })}><option value="daily">{t("Daily")}</option><option value="weekly">{t("Weekly")}</option><option value="monthly">{t("Monthly")}</option><option value="quarterly">{t("Quarterly")}</option><option value="yearly">{t("Yearly")}</option><option value="all">{t("All")}</option></select></label>
         <label>{t("Target email address(es)")}<input type="text" value={reportSettings.reportRecipients} onChange={(event) => setReportSettings({ ...reportSettings, reportRecipients: event.target.value })} placeholder="lab@example.com, qa@example.com" /></label>
         {reportSettings.reportEnabled && !reportsReady ? <div className="banner warning">Email reports are enabled, but cannot run until the InfluxDB history connection is healthy. Current history status: {humanStatus(historicalStatus?.state ?? "checking", t)}.</div> : null}
-        {reportSettings.reportEnabled && reportsReady ? <p className="muted">Next scheduled report: {historicalStatus?.nextReportAt ? new Date(historicalStatus.nextReportAt).toLocaleString() : "Not calculated"}</p> : null}
-        {reportSettings.reportEnabled && historicalStatus?.lastReportSentAt ? <p className="muted">Last report: {new Date(historicalStatus.lastReportSentAt).toLocaleString()}</p> : null}
+        {reportSettings.reportEnabled && reportsReady ? <p className="muted">Next scheduled report: {historicalStatus?.nextReportAt ? parseBackendDate(historicalStatus.nextReportAt).toLocaleString() : "Not calculated"}</p> : null}
+        {reportSettings.reportEnabled && historicalStatus?.lastReportSentAt ? <p className="muted">Last report: {parseBackendDate(historicalStatus.lastReportSentAt).toLocaleString()}</p> : null}
         {reportSettings.reportEnabled && reportsReady ? <p className="muted">{reportSettings.reportFrequency === "all" ? "All exports are sent at the next midnight run and then switch automatically to quarterly." : "Manual sending uses the last completed calendar period for the selected frequency."}</p> : null}
         {reportSettings.reportEnabled && (historicalStatus?.lastReportStatus || sendReport.data?.message) ? <p className="muted">{historicalStatus?.lastReportStatus ?? sendReport.data?.message}</p> : null}
         <button className="primary-button" type="submit" disabled={save.isPending}>{save.isPending ? t("Saving...") : t("Save report settings")}</button>
@@ -470,7 +471,7 @@ function EventsPage() {
   const queryClient = useQueryClient();
   const { data: events = [], isLoading } = useQuery({ queryKey: ["events"], queryFn: () => fetchJson<EventRead[]>("/api/events") });
   const purge = useMutation({ mutationFn: () => fetchJson<void>("/api/events", { method: "DELETE" }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["events"] }); void queryClient.invalidateQueries({ queryKey: ["bootstrap"] }); } });
-  return <PageFrame title="Events" body={t("Read-only operational and audit feed for TempVerity.")}><section className="panel"><div className="panel-header"><div><h2 className="section-title"><Icon name="events" />Event feed</h2><span className="muted">Showing the 25 most recent entries</span></div><button className="danger-button" type="button" disabled={purge.isPending || events.length === 0} onClick={() => { if (window.confirm("Purge all local TempVerity events? This does not contact or change any fridge.")) purge.mutate(); }}><Icon name="trash" />{purge.isPending ? "Purging..." : t("Purge events")}</button></div>{purge.error ? <div className="banner error">Unable to purge events: {String(purge.error)}</div> : null}{isLoading ? <p className="lede">Loading events...</p> : events.length === 0 ? <p className="lede">No events recorded.</p> : <div className="event-table-wrap"><table className="event-table"><thead><tr><th>Time</th><th>Event</th><th>Status</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td><time dateTime={event.created_at}>{new Date(event.created_at).toLocaleString()}</time></td><td><strong>{eventTitle(event, t)}</strong><div className="muted">{eventContext(event, t)}</div></td><td><span className={`status-pill ${event.status === "failed" ? "danger" : event.status === "active" ? "warning" : "ok"}`}>{humanStatus(event.status, t)}</span></td></tr>)}</tbody></table></div>}</section></PageFrame>;
+  return <PageFrame title="Events" body={t("Read-only operational and audit feed for TempVerity.")}><section className="panel"><div className="panel-header"><div><h2 className="section-title"><Icon name="events" />Event feed</h2><span className="muted">Showing the 25 most recent entries</span></div><button className="danger-button" type="button" disabled={purge.isPending || events.length === 0} onClick={() => { if (window.confirm("Purge all local TempVerity events? This does not contact or change any fridge.")) purge.mutate(); }}><Icon name="trash" />{purge.isPending ? "Purging..." : t("Purge events")}</button></div>{purge.error ? <div className="banner error">Unable to purge events: {String(purge.error)}</div> : null}{isLoading ? <p className="lede">Loading events...</p> : events.length === 0 ? <p className="lede">No events recorded.</p> : <div className="event-table-wrap"><table className="event-table"><thead><tr><th>Time</th><th>Event</th><th>Status</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td><time dateTime={event.created_at}>{parseBackendDate(event.created_at).toLocaleString()}</time></td><td><strong>{eventTitle(event, t)}</strong><div className="muted">{eventContext(event, t)}</div></td><td><span className={`status-pill ${event.status === "failed" ? "danger" : event.status === "active" ? "warning" : "ok"}`}>{humanStatus(event.status, t)}</span></td></tr>)}</tbody></table></div>}</section></PageFrame>;
 }
 
 function DevicesPage() {
@@ -542,7 +543,7 @@ function DevicePage() {
       setSetpointValues(Object.fromEntries(device.zones.map((zone) => [zone.zone_index, zone.target_c == null ? "" : String(zone.target_c)])));
     }
   }, [device]);
-  const refresh = useMutation({ mutationFn: () => fetchJson<DeviceSnapshot>(`/api/devices/${deviceId}/refresh`, { method: "POST" }), onSuccess: (next) => queryClient.setQueryData(["device", deviceId], next) });
+  const refresh = useMutation({ mutationFn: () => fetchJson<DeviceSnapshot>(`/api/devices/${deviceId}/refresh`, { method: "POST" }), onSuccess: (next) => { queryClient.setQueryData(["device", deviceId], next); void queryClient.invalidateQueries({ queryKey: ["bootstrap"] }); void queryClient.invalidateQueries({ queryKey: ["devices"] }); } });
   const imageRefresh = useMutation({ mutationFn: () => fetchJson<DeviceSnapshot>(`/api/devices/${deviceId}/image/refresh`, { method: "POST" }), onSuccess: (next) => queryClient.setQueryData(["device", deviceId], next) });
   const control = useMutation({
     mutationFn: ({ action, payload, method = "POST" }: { action: string; payload?: Record<string, unknown>; method?: "POST" | "DELETE" }) => fetchJson<DeviceSnapshot>(`/api/devices/${deviceId}/controls/${action}`, { method, ...(method === "POST" ? { body: JSON.stringify({ payload: payload ?? {} }) } : {}) }),
@@ -595,13 +596,13 @@ function DevicePage() {
     ["lowertemperaturealarm", "Acknowledge lower temperature alarm", "temperature/alarm/lower", "DELETE"],
   ] as const;
   return (
-    <PageFrame title={device.name} body={`${device.model} | ${device.location || t("No location configured")}`}>
+    <PageFrame title={device.name} body={`${device.model} | ${device.location || t("No location configured")}`} onRefresh={() => refresh.mutate()} isRefreshing={refresh.isPending}>
       <div className="detail-actions"><Link className="secondary-button" to="/devices">All devices</Link><button className="primary-button" onClick={() => refresh.mutate()} disabled={refresh.isPending}>{refresh.isPending ? "Refreshing..." : "Refresh appliance"}</button><button className="secondary-button" onClick={() => imageRefresh.mutate()} disabled={imageRefresh.isPending || Boolean(device.image_url)}>{imageRefresh.isPending ? "Finding image..." : device.image_url ? "Image loaded" : "Find fridge image"}</button><button className="danger-button" onClick={() => { if (window.confirm("Remove this appliance and its cached history?")) remove.mutate(); }}>Remove</button></div>
       {imageRefresh.error ? <div className="banner error">No suitable automatic image was found. The fallback image remains available.</div> : null}
       {readOnly ? <div className="banner readonly-banner">{t("Read-only monitoring mode is active. Fridge controls are disabled.")}</div> : null}
       <div className="device-detail-sections">
       <section className="panel detail-summary">
-        <div><span className={`status-pill ${device.status}`}>{device.status}</span><p className="muted">{device.api_url}</p><p className="muted">{t("Last successful update:")} {device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : t("Never")}</p></div>
+        <div><span className={`status-pill ${device.status}`}>{device.status}</span><p className="muted">{device.api_url}</p><p className="muted">{t("Last successful update:")} {device.last_seen_at ? parseBackendDate(device.last_seen_at).toLocaleString() : t("Never")}</p></div>
         <div className="metric-strip"><div><span className="metric-label">{t("Current")}</span><strong>{device.temperature_c ?? "—"}°C</strong></div><div><span className="metric-label">{t("Target")}</span><strong>{device.target_c ?? "—"}°C</strong></div><div><span className="metric-label">{t("Door")}</span><strong>{device.door_open ? t("Open") : t("Closed")}</strong></div></div>
       </section>
       <section className="zone-detail-grid">
@@ -615,10 +616,10 @@ function DevicePage() {
   );
 }
 
-function PageFrame({ title, body, children }: { title: string; body: string; children: ReactNode }) {
+function PageFrame({ title, body, children, onRefresh, isRefreshing }: { title: string; body: string; children: ReactNode; onRefresh?: () => void; isRefreshing?: boolean }) {
   const { t } = useTranslation();
   const { data, refetch, isFetching } = useQuery({ queryKey: ["bootstrap"], queryFn: () => fetchJson<BootstrapResponse>("/api/bootstrap") });
-  return <div className="shell"><Sidebar /><main className="main"><Header greeting={t(title)} description={body} generatedAt={data?.generated_at ?? new Date().toISOString()} onRefresh={() => refetch()} isRefreshing={isFetching} />{children}</main></div>;
+  return <div className="shell"><Sidebar /><main className="main"><Header greeting={t(title)} description={body} generatedAt={data?.generated_at ?? new Date().toISOString()} onRefresh={onRefresh ?? (() => { void refetch(); })} isRefreshing={onRefresh ? Boolean(isRefreshing) : isFetching} />{children}</main></div>;
 }
 
 export function App() {

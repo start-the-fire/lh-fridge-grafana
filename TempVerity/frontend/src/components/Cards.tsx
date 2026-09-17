@@ -1,5 +1,6 @@
 import { Icon } from "./Icon";
 import { useTranslation } from "../i18n";
+import { parseBackendDate } from "../date";
 
 type StatCardProps = {
   label: string;
@@ -56,7 +57,7 @@ function DeviceMetricIcon({ kind }: { kind: "temperature" | "door" | "alarm" }) 
 export function DeviceCard({ device, expanded = false }: DeviceCardProps) {
   const { t } = useTranslation();
   const hasAlarm = device.zones.some((zone) => Boolean(zone.alarm));
-  const updatedAt = device.last_seen_at ? new Date(device.last_seen_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : t("Not updated");
+  const updatedAt = device.last_seen_at ? parseBackendDate(device.last_seen_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : t("Not updated");
   return (
     <article className={`device-card${expanded ? " expanded" : ""}`}>
       <div className="device-card-image">

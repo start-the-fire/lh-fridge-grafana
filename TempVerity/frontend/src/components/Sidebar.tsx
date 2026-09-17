@@ -35,7 +35,7 @@ function FooterIcon({ kind }: { kind: "help" | "about" }) {
 
 export function Sidebar() {
   const { language, setLanguage, t } = useTranslation();
-  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("tempverity-sidebar-collapsed") === "true");
+  const [collapsed, setCollapsed] = useState(() => window.innerWidth <= 760 || window.localStorage.getItem("tempverity-sidebar-collapsed") === "true");
   const { data: metadata } = useQuery({ queryKey: ["metadata"], queryFn: () => fetchJson<AppMetadata>("/api/metadata") });
   const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: () => fetchJson<AuthStatus>("/api/auth/status") });
   const supportEmail = metadata?.support_email ?? "placeholder@placeholder.com";

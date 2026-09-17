@@ -419,6 +419,11 @@ def logo_square() -> FileResponse:
     return FileResponse(settings.frontend_dist / "logo_square.png", media_type="image/png")
 
 
+@app.get("/manifest.webmanifest")
+def web_manifest() -> FileResponse:
+    return FileResponse(settings.frontend_dist / "manifest.webmanifest", media_type="application/manifest+json")
+
+
 @app.get("/fridge-fallback.svg")
 def fridge_fallback() -> FileResponse:
     return FileResponse(settings.frontend_dist / "fridge-fallback.svg")

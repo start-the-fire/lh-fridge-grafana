@@ -1,0 +1,19 @@
+{
+  "name": "TempVerity",
+  "short_name": "TempVerity",
+  "description": "Temperature monitoring and appliance control for professional refrigeration.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eff4fa",
+  "theme_color": "#142739",
+  "icons": [
+    {
+      "src": "/logo_square.png",
+      "sizes": "440x440",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
