@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchJson } from "../api/client";
 import type { AppMetadata, AuthStatus } from "../types";
+import { useTranslation } from "../i18n";
 
 const items = [
   { to: "/", label: "Dashboard", icon: "dashboard" },
@@ -33,6 +34,7 @@ function FooterIcon({ kind }: { kind: "help" | "about" }) {
 }
 
 export function Sidebar() {
+  const { language, setLanguage, t } = useTranslation();
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("tempverity-sidebar-collapsed") === "true");
   const { data: metadata } = useQuery({ queryKey: ["metadata"], queryFn: () => fetchJson<AppMetadata>("/api/metadata") });
   const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: () => fetchJson<AuthStatus>("/api/auth/status") });
@@ -42,7 +44,7 @@ export function Sidebar() {
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
       <div className="brand">
         <img className="sidebar-logo" src={collapsed ? "/logo_square.png?v=1" : "/tempverity-logo-v3.png"} alt="TempVerity" />
-        <button className="sidebar-toggle" type="button" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} title={collapsed ? "Expand navigation" : "Collapse navigation"} onClick={() => { const next = !collapsed; setCollapsed(next); window.localStorage.setItem("tempverity-sidebar-collapsed", String(next)); }}>
+        <button className="sidebar-toggle" type="button" aria-label={t(collapsed ? "Expand navigation" : "Collapse navigation")} title={t(collapsed ? "Expand navigation" : "Collapse navigation")} onClick={() => { const next = !collapsed; setCollapsed(next); window.localStorage.setItem("tempverity-sidebar-collapsed", String(next)); }}>
           <span aria-hidden="true">{collapsed ? "›" : "‹"}</span>
         </button>
       </div>
@@ -53,17 +55,21 @@ export function Sidebar() {
             key={item.to}
             to={item.to}
             end={item.to === "/" || item.to === "/settings"}
-            title={item.label}
+            title={t(item.label)}
             className={({ isActive }) => `nav-link${item.child ? " child" : ""}${isActive ? " active" : ""}`}
           >
-            <SidebarIcon name={item.icon} /><span className="nav-label">{item.label}</span>
+            <SidebarIcon name={item.icon} /><span className="nav-label">{t(item.label)}</span>
           </NavLink>
         ))}
       </nav>
 
       <div className="sidebar-footer">
-        <a className="sidebar-footer-link support-link" href={`mailto:${supportEmail}`}><FooterIcon kind="help" /><span>Help &amp; Support</span></a>
-        <Link className="sidebar-footer-link about-link" to="/about"><FooterIcon kind="about" /><span>About</span></Link>
+        <a className="sidebar-footer-link support-link" href={`mailto:${supportEmail}`}><FooterIcon kind="help" /><span>{t("Help & Support")}</span></a>
+        <Link className="sidebar-footer-link about-link" to="/about"><FooterIcon kind="about" /><span>{t("About")}</span></Link>
+        <div className="language-toggle" role="group" aria-label={t("Language")}>
+          <button type="button" className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")} aria-pressed={language === "en"}>EN</button>
+          <button type="button" className={language === "de" ? "active" : ""} onClick={() => setLanguage("de")} aria-pressed={language === "de"}>DE</button>
+        </div>
         <span className="sidebar-version">v{metadata?.version ?? "1.0.0"}</span>
       </div>
     </aside>

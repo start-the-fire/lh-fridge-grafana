@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/api/client.ts","./src/components/cards.tsx","./src/components/controlmodebadge.tsx","./src/components/header.tsx","./src/components/icon.tsx","./src/components/sidebar.tsx"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/i18n.tsx","./src/main.tsx","./src/types.ts","./src/api/client.ts","./src/components/cards.tsx","./src/components/controlmodebadge.tsx","./src/components/header.tsx","./src/components/icon.tsx","./src/components/sidebar.tsx"],"version":"5.9.3"}

@@ -25,6 +25,10 @@
 .status-pill.mode-controls { background: #e5f0ff; color: #175a9e; }
 .status-pill.mode-readonly { background: #edf1f5; color: #485c70; }
 .nav-link.active { background: linear-gradient(110deg, #0966b7, #164e84); }
+.language-toggle { display: flex; gap: .25rem; margin-top: .4rem; padding: .2rem; border: 1px solid rgba(255, 255, 255, .16); border-radius: .45rem; }
+.language-toggle button { flex: 1; border: 0; border-radius: .3rem; padding: .3rem .4rem; color: #c8d6e5; background: transparent; cursor: pointer; font-size: .72rem; font-weight: 700; }
+.language-toggle button.active { color: #fff; background: rgba(255, 255, 255, .16); }
+.sidebar.collapsed .language-toggle { flex-direction: column; }
 .nav-icon, .footer-icon { stroke-width: 1.7; }
 .primary-button, .secondary-button, .danger-button, .view-toggle button {
   display: inline-flex; align-items: center; justify-content: center; gap: .45rem;

@@ -1,4 +1,5 @@
 import { Icon } from "./Icon";
+import { useTranslation } from "../i18n";
 
 type StatCardProps = {
   label: string;
@@ -53,8 +54,9 @@ function DeviceMetricIcon({ kind }: { kind: "temperature" | "door" | "alarm" }) 
 }
 
 export function DeviceCard({ device, expanded = false }: DeviceCardProps) {
+  const { t } = useTranslation();
   const hasAlarm = device.zones.some((zone) => Boolean(zone.alarm));
-  const updatedAt = device.last_seen_at ? new Date(device.last_seen_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "Not updated";
+  const updatedAt = device.last_seen_at ? new Date(device.last_seen_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : t("Not updated");
   return (
     <article className={`device-card${expanded ? " expanded" : ""}`}>
       <div className="device-card-image">
@@ -64,26 +66,26 @@ export function DeviceCard({ device, expanded = false }: DeviceCardProps) {
       <div className="device-card-body">
         <div className="device-card-heading">
           <div className="device-row">
-            <span className={`status-pill ${device.status}`}>{device.status === "ok" ? "Online" : device.status}</span>
-            <span className="muted">{device.zone_count} zone{device.zone_count === 1 ? "" : "s"}</span>
+            <span className={`status-pill ${device.status}`}>{device.status === "ok" ? t("Online") : t(device.status)}</span>
+            <span className="muted">{device.zone_count} {t(device.zone_count === 1 ? "Zone" : "Zones")}</span>
           </div>
           <h3>{device.name}</h3>
-          <p className="device-meta muted"><span>{device.model}</span><span>{device.location || "No location"}</span></p>
+          <p className="device-meta muted"><span>{device.model}</span><span>{device.location || t("No location")}</span></p>
         </div>
 
         <div className="metric-strip">
           <div>
-            <DeviceMetricIcon kind="temperature" /><span className="metric-copy"><span className="metric-label">Current</span><strong>{formatTemperature(device.temperature_c)}</strong><small>Target: {formatTemperature(device.target_c)}</small></span>
+            <DeviceMetricIcon kind="temperature" /><span className="metric-copy"><span className="metric-label">{t("Current")}</span><strong>{formatTemperature(device.temperature_c)}</strong><small>{t("Target")}: {formatTemperature(device.target_c)}</small></span>
           </div>
           <div>
-            <DeviceMetricIcon kind="door" /><span className="metric-copy"><span className="metric-label">Door</span><strong>{device.door_open ? "Open" : "Closed"}</strong></span>
+            <DeviceMetricIcon kind="door" /><span className="metric-copy"><span className="metric-label">{t("Door")}</span><strong>{t(device.door_open ? "Open" : "Closed")}</strong></span>
           </div>
           <div>
-            <DeviceMetricIcon kind="alarm" /><span className="metric-copy"><span className="metric-label">Alarms</span><strong>{hasAlarm ? "Active" : "None"}</strong></span>
+            <DeviceMetricIcon kind="alarm" /><span className="metric-copy"><span className="metric-label">{t("Alarms")}</span><strong>{t(hasAlarm ? "Active" : "None")}</strong></span>
           </div>
         </div>
 
-        <div className="device-card-footer"><span>{device.zone_count} zone{device.zone_count === 1 ? "" : "s"}</span><span className="footer-divider" /><span>Updated: {updatedAt}</span></div>
+        <div className="device-card-footer"><span>{device.zone_count} {t(device.zone_count === 1 ? "Zone" : "Zones")}</span><span className="footer-divider" /><span>{t("Updated")}: {updatedAt}</span></div>
       </div>
     </article>
   );

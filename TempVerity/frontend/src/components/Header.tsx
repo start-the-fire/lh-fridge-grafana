@@ -1,3 +1,5 @@
+import { useTranslation } from "../i18n";
+
 type HeaderProps = {
   greeting: string;
   description?: string;
@@ -7,23 +9,24 @@ type HeaderProps = {
 };
 
 export function Header({ greeting, description = "Current status, state cache, and device controls in one place.", generatedAt, onRefresh, isRefreshing }: HeaderProps) {
+  const { t } = useTranslation();
   const date = new Date(generatedAt);
   return (
     <header className="header">
       <div>
-        <p className="eyebrow">Operations dashboard</p>
-        <h1>{greeting}!</h1>
-        <p className="lede">{description}</p>
+        <p className="eyebrow">{t("Operations dashboard")}</p>
+        <h1>{t(greeting)}</h1>
+        <p className="lede">{t(description)}</p>
       </div>
 
       <div className="header-actions">
         <div className="timestamp">
-          <small>Last updated</small>
+          <small>{t("Last updated")}</small>
           <span>{date.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
           <strong>{date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</strong>
         </div>
         <button className="primary-button" type="button" onClick={onRefresh} disabled={isRefreshing}>
-          {isRefreshing ? "Refreshing..." : "Refresh"}
+          {isRefreshing ? t("Refreshing...") : t("Refresh")}
         </button>
       </div>
     </header>
